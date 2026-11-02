@@ -1,103 +1,94 @@
-async function getWeather() {
+<div id="weatherIcon" class="weather-icon">🌤️</div>
 
-    const city = document.getElementById("cityInput").value.trim();
-    const result = document.getElementById("weatherResult");
+const cityInput = document.getElementById("cityInput");
+const searchBtn = document.getElementById("searchBtn");
 
-    if (city === "") {
-        result.innerHTML = `
-            <p class="error">Please enter a city name.</p>
-        `;
+const cityName = document.getElementById("cityName");
+const temperature = document.getElementById("temperature");
+const condition = document.getElementById("condition");
+const humidity = document.getElementById("humidity");
+const wind = document.getElementById("wind");
+const weatherIcon = document.getElementById("weatherIcon");
+const error = document.getElementById("error");
+
+// Weather condition codes
+function getWeather(code) {
+    if (code === 0) return ["Clear Sky", "☀️"];
+    if (code <= 3) return ["Partly Cloudy", "⛅"];
+    if (code <= 48) return ["Foggy", "🌫️"];
+    if (code <= 57) return ["Drizzle", "🌦️"];
+    if (code <= 67) return ["Rainy", "🌧️"];
+    if (code <= 77) return ["Snowy", "❄️"];
+    if (code <= 82) return ["Rain Showers", "🌦️"];
+    if (code <= 86) return ["Snow Showers", "🌨️"];
+    if (code <= 99) return ["Thunderstorm", "⛈️"];
+
+    return ["Unknown", "🌡️"];
+}
+
+// Fetch weather data
+async function getWeatherData(city) {
+    if (!city.trim()) {
+        error.innerText = "Please enter a city name!";
         return;
     }
 
     try {
-
-        result.innerHTML = `<p>Loading...</p>`;
+        error.innerText = "Loading weather...";
 
         // Find city coordinates
-        const geoResponse = await fetch(
-            `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`
-        );
+        const geoURL =
+            `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`;
+
+        const geoResponse = await fetch(geoURL);
+        if (!geoResponse.ok) throw new Error("Network error");
 
         const geoData = await geoResponse.json();
 
         if (!geoData.results || geoData.results.length === 0) {
-            result.innerHTML = `
-                <p class="error">City not found!</p>
-            `;
-            return;
+            throw new Error("City not found!");
         }
 
-        const location = geoData.results[0];
+        const place = geoData.results[0];
 
-        const latitude = location.latitude;
-        const longitude = location.longitude;
+        // Get live weather
+        const weatherURL =
+            `https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&timezone=auto`;
 
-        // Get weather
-        const weatherResponse = await fetch(
-            `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&timezone=auto`
-        );
+        const weatherResponse = await fetch(weatherURL);
+        if (!weatherResponse.ok) throw new Error("Weather unavailable");
 
         const weatherData = await weatherResponse.json();
-
         const current = weatherData.current;
 
-        result.innerHTML = `
-            <h2>${location.name}, ${location.country}</h2>
+        const [weatherText, icon] = getWeather(current.weather_code);
 
-            <div class="temperature">
-                ${current.temperature_2m}°C
-            </div>
+        // Display data
+        cityName.innerText = place.name + ", " + place.country;
+        temperature.innerText = Math.round(current.temperature_2m) + "°C";
+        condition.innerText = weatherText;
+        humidity.innerText = current.relative_humidity_2m + "%";
+        wind.innerText = current.wind_speed_10m + " km/h";
+        weatherIcon.innerText = icon;
 
-            <p>💧 Humidity: ${current.relative_humidity_2m}%</p>
+        error.innerText = "";
 
-            <p>💨 Wind Speed: ${current.wind_speed_10m} km/h</p>
-
-            <p>🌤️ Weather: ${getWeatherDescription(current.weather_code)}</p>
-        `;
-
-    } catch (error) {
-
-        result.innerHTML = `
-            <p class="error">
-                Something went wrong. Please try again.
-            </p>
-        `;
-
-        console.error(error);
+    } catch (err) {
+        error.innerText = err.message;
     }
 }
 
+// Search button
+searchBtn.addEventListener("click", function() {
+    getWeatherData(cityInput.value);
+});
 
-function getWeatherDescription(code) {
-
-    if (code === 0) {
-        return "Clear Sky ☀️";
+// Enter key
+cityInput.addEventListener("keydown", function(event) {
+    if (event.key === "Enter") {
+        getWeatherData(cityInput.value);
     }
+});
 
-    if (code >= 1 && code <= 3) {
-        return "Partly Cloudy 🌤️";
-    }
-
-    if (code >= 45 && code <= 48) {
-        return "Fog 🌫️";
-    }
-
-    if (code >= 51 && code <= 67) {
-        return "Rain 🌧️";
-    }
-
-    if (code >= 71 && code <= 77) {
-        return "Snow ❄️";
-    }
-
-    if (code >= 80 && code <= 82) {
-        return "Rain Showers 🌦️";
-    }
-
-    if (code >= 95 && code <= 99) {
-        return "Thunderstorm ⛈️";
-    }
-
-    return "Unknown Weather";
-}
+// Default city
+getWeatherData("Delhi");
